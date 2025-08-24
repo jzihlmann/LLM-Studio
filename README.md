@@ -1,1 +1,1 @@
-# LLM-Studio
+# Dies ist ein privates Projekt für die Erstellung eines lokalen LLM Clients.
