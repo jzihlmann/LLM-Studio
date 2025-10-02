@@ -1,0 +1,119 @@
+/* General Window Styling */
+QMainWindow, QWidget {
+    background-color: {{{COLORS.BACKGROUND_DARK}}};
+    color: {{{COLORS.TEXT_LIGHT}}};
+    font-family: {{{FONTS.FAMILY}}};
+    font-size: {{{FONTS.SIZE_NORMAL}}};
+    border: none;
+}
+
+/* --- Custom Scrollbar Styling --- */
+QScrollArea {
+    border: none;
+}
+
+QScrollBar:vertical {
+    border: none;
+    background: {{{COLORS.BACKGROUND_MEDIUM}}};
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:vertical {
+    background: {{{COLORS.BACKGROUND_LIGHT}}};
+    min-height: 20px;
+    border-radius: 5px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* Main Content Area */
+#main_content_widget {
+    background-color: {{{COLORS.BACKGROUND_MEDIUM}}};
+    border-radius: {{{RADIUS.MEDIUM}}};
+}
+
+/* Left Sidebar Placeholder */
+QListWidget {
+    background-color: {{{COLORS.BACKGROUND_DARK}}};
+    border-radius: {{{RADIUS.SMALL}}};
+    padding: {{{SPACING.SMALL}}};
+    border: none; /* Removed border for a cleaner look */
+}
+
+/* Input field for chat messages */
+QLineEdit {
+    background-color: {{{COLORS.BACKGROUND_LIGHT}}};
+    color: {{{COLORS.TEXT_LIGHT}}};
+    border: 1px solid {{{COLORS.BORDER}}};
+    border-radius: {{{RADIUS.SMALL}}};
+    padding: {{{SPACING.MEDIUM}}};
+    font-size: {{{FONTS.SIZE_NORMAL}}};
+    min-height: 24px; /* Ensure a consistent height */
+}
+
+QLineEdit:focus {
+    border: 1px solid {{{COLORS.PRIMARY_BLUE}}};
+}
+
+/* General Button Styling */
+QPushButton {
+    background-color: {{{COLORS.PRIMARY_BLUE}}};
+    color: {{{COLORS.TEXT_LIGHT}}};
+    border: none;
+    padding: 12px;
+    border-radius: {{{RADIUS.SMALL}}};
+    font-weight: bold;
+    min-height: 20px;
+}
+
+QPushButton:hover {
+    background-color: #60a5fa; /* A lighter shade of blue */
+}
+
+QPushButton:pressed {
+    background-color: #2563eb; /* A darker shade of blue */
+}
+
+/* Top Navigation Button */
+#top_nav_button {
+    background-color: transparent;
+    border: none;
+    padding: {{{SPACING.MEDIUM}}};
+    text-align: left;
+    font-weight: bold;
+    font-size: {{{FONTS.SIZE_LARGE}}};
+}
+
+#top_nav_button:hover {
+    background-color: {{{COLORS.BACKGROUND_LIGHT}}};
+}
+
+/* --- Chat Bubble Styling --- */
+/* We now use property selectors, which are more reliable for dynamic widgets */
+QLabel[class="user-bubble"], QLabel[class="llm-bubble"] {
+    color: {{{COLORS.TEXT_LIGHT}}};
+    padding: {{{SPACING.MEDIUM}}};
+    border-radius: {{{RADIUS.LARGE}}};
+    margin-top: {{{SPACING.SMALL}}};
+    margin-bottom: {{{SPACING.SMALL}}};
+}
+
+/* User's chat bubble (right-aligned) */
+QLabel[class="user-bubble"] {
+    background-color: {{{COLORS.USER_BUBBLE}}};
+}
+
+/* LLM's chat bubble (left-aligned) */
+QLabel[class="llm-bubble"] {
+    background-color: {{{COLORS.LLM_BUBBLE}}};
+}
+
