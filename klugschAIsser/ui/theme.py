@@ -1,54 +1,33 @@
 from pathlib import Path
 
-# Central repository for all design parameters (colors, fonts, etc.)
-# This makes it easy to change the application's appearance globally.
 THEME = {
     "COLORS": {
-        "PRIMARY_BLUE": "#3b82f6",
+        "BACKGROUND_DARK": "#111827",  # Hauptfenster Hintergrund
+        "BACKGROUND_MEDIUM": "#1f2937",  # Fallback
+        "BACKGROUND_LIGHT": "#374151",  # Eingabefelder
+
+        # NEU: Liquid Glass Definitionen
+        # Wir nutzen RGBA für Transparenz
+        "GLASS_BG": "rgba(31, 41, 55, 0.6)",  # Dunkel, leicht transparent
+        "GLASS_BORDER": "rgba(255, 255, 255, 0.08)",  # Subtiler heller Rand für 3D
+
+        "PRIMARY": "#3b82f6",
+        "TEXT": "#f9fafb",
         "USER_BUBBLE": "#2563eb",
-        "LLM_BUBBLE": "#4b5563",
-        "BACKGROUND_DARK": "#111827",
-        "BACKGROUND_MEDIUM": "#1f2937",
-        "BACKGROUND_LIGHT": "#374151",
-        "TEXT_LIGHT": "#f9fafb",
-        "TEXT_DARK": "#e5e7eb",
-        "BORDER": "#4b5563",
-    },
-    "FONTS": {
-        "FAMILY": "Segoe UI",
-        "SIZE_NORMAL": "14px",
-        "SIZE_LARGE": "16px",
-    },
-    "SPACING": {
-        "SMALL": "5px",
-        "MEDIUM": "10px",
-        "LARGE": "15px",
-    },
-    "RADIUS": {
-        "SMALL": "5px",
-        "MEDIUM": "10px",
-        "LARGE": "15px",  # For the pill-shaped bubbles
+        "LLM_BUBBLE": "#4b5563"
     }
 }
 
 
 def load_stylesheet():
-    """
-    Loads the QSS template file, replaces placeholders with theme values,
-    and returns the complete stylesheet string.
-    """
-    qss_path = Path(__file__).parent / "style.qss"
-    try:
-        with open(qss_path, "r") as f:
-            stylesheet = f.read()
+    path = Path(__file__).parent / "style.qss"
+    # Fehlerbehandlung, falls Datei nicht existiert
+    if not path.exists():
+        return ""
 
-        # Replace all placeholders in the QSS file
-        for category, values in THEME.items():
-            for key, value in values.items():
-                placeholder = f"{{{{{category}.{key}}}}}"
-                stylesheet = stylesheet.replace(placeholder, value)
+    with open(path, "r") as f:
+        style = f.read()
 
-        return stylesheet
-    except FileNotFoundError:
-        print(f"Error: Stylesheet file not found at {qss_path}")
-        return ""  # Return empty string if file is not found
+    for key, val in THEME["COLORS"].items():
+        style = style.replace(f"{{{{COLORS.{key}}}}}", val)
+    return style

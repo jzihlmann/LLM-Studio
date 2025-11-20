@@ -1,119 +1,79 @@
-/* General Window Styling */
 QMainWindow, QWidget {
-    background-color: {{{COLORS.BACKGROUND_DARK}}};
-    color: {{{COLORS.TEXT_LIGHT}}};
-    font-family: {{{FONTS.FAMILY}}};
-    font-size: {{{FONTS.SIZE_NORMAL}}};
+    background-color: {{COLORS.BACKGROUND_DARK}};
+    color: {{COLORS.TEXT}};
+    font-family: "Segoe UI", sans-serif;
+    font-size: 14px;
     border: none;
 }
 
-/* --- Custom Scrollbar Styling --- */
-QScrollArea {
-    border: none;
+/* --- Die drei Bento-Boxen (Container) --- */
+/* Diese IDs steuern den "Liquid Glass" Look */
+#container_nav, #container_sidebar, #container_chat {
+    background-color: {{COLORS.GLASS_BG}};
+    border: 1px solid {{COLORS.GLASS_BORDER}};
+    border-radius: 15px;
 }
 
-QScrollBar:vertical {
-    border: none;
-    background: {{{COLORS.BACKGROUND_MEDIUM}}};
-    width: 10px;
-    margin: 0px 0px 0px 0px;
-}
-
-QScrollBar::handle:vertical {
-    background: {{{COLORS.BACKGROUND_LIGHT}}};
-    min-height: 20px;
-    border-radius: 5px;
-}
-
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-    border: none;
-    background: none;
-    height: 0px;
-}
-
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-    background: none;
-}
-
-/* Main Content Area */
-#main_content_widget {
-    background-color: {{{COLORS.BACKGROUND_MEDIUM}}};
-    border-radius: {{{RADIUS.MEDIUM}}};
-}
-
-/* Left Sidebar Placeholder */
-QListWidget {
-    background-color: {{{COLORS.BACKGROUND_DARK}}};
-    border-radius: {{{RADIUS.SMALL}}};
-    padding: {{{SPACING.SMALL}}};
-    border: none; /* Removed border for a cleaner look */
-}
-
-/* Input field for chat messages */
-QLineEdit {
-    background-color: {{{COLORS.BACKGROUND_LIGHT}}};
-    color: {{{COLORS.TEXT_LIGHT}}};
-    border: 1px solid {{{COLORS.BORDER}}};
-    border-radius: {{{RADIUS.SMALL}}};
-    padding: {{{SPACING.MEDIUM}}};
-    font-size: {{{FONTS.SIZE_NORMAL}}};
-    min-height: 24px; /* Ensure a consistent height */
-}
-
-QLineEdit:focus {
-    border: 1px solid {{{COLORS.PRIMARY_BLUE}}};
-}
-
-/* General Button Styling */
-QPushButton {
-    background-color: {{{COLORS.PRIMARY_BLUE}}};
-    color: {{{COLORS.TEXT_LIGHT}}};
-    border: none;
-    padding: 12px;
-    border-radius: {{{RADIUS.SMALL}}};
-    font-weight: bold;
-    min-height: 20px;
-}
-
-QPushButton:hover {
-    background-color: #60a5fa; /* A lighter shade of blue */
-}
-
-QPushButton:pressed {
-    background-color: #2563eb; /* A darker shade of blue */
-}
-
-/* Top Navigation Button */
+/* --- Navigation --- */
 #top_nav_button {
+    font-size: 16px;
+    font-weight: bold;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background-color: transparent; /* Button fügt sich in Glas-Container ein */
+}
+#top_nav_button:hover {
+    background-color: {{COLORS.BACKGROUND_LIGHT}};
+}
+
+/* --- Sidebar Inhalt --- */
+/* Damit die Liste transparent ist und der Container-Hintergrund wirkt */
+QListWidget {
     background-color: transparent;
     border: none;
-    padding: {{{SPACING.MEDIUM}}};
-    text-align: left;
+    outline: none;
+}
+
+/* --- Chat Bereich --- */
+/* Der Chat-Bereich selbst soll transparent sein, damit er im Container sitzt */
+QScrollArea, QWidget#chat_scroll_content {
+    background-color: transparent;
+}
+
+/* Inputs im Chat */
+QLineEdit {
+    background-color: {{COLORS.BACKGROUND_LIGHT}};
+    border: 1px solid {{COLORS.GLASS_BORDER}};
+    border-radius: 10px;
+    padding: 10px;
+    color: {{COLORS.TEXT}};
+}
+
+/* Buttons */
+QPushButton {
+    background-color: {{COLORS.PRIMARY}};
+    color: white;
+    border-radius: 8px;
+    padding: 8px 16px;
     font-weight: bold;
-    font-size: {{{FONTS.SIZE_LARGE}}};
+}
+QPushButton:hover {
+    background-color: #60a5fa;
 }
 
-#top_nav_button:hover {
-    background-color: {{{COLORS.BACKGROUND_LIGHT}}};
-}
-
-/* --- Chat Bubble Styling --- */
-/* We now use property selectors, which are more reliable for dynamic widgets */
-QLabel[class="user-bubble"], QLabel[class="llm-bubble"] {
-    color: {{{COLORS.TEXT_LIGHT}}};
-    padding: {{{SPACING.MEDIUM}}};
-    border-radius: {{{RADIUS.LARGE}}};
-    margin-top: {{{SPACING.SMALL}}};
-    margin-bottom: {{{SPACING.SMALL}}};
-}
-
-/* User's chat bubble (right-aligned) */
+/* Bubbles */
 QLabel[class="user-bubble"] {
-    background-color: {{{COLORS.USER_BUBBLE}}};
+    background-color: {{COLORS.USER_BUBBLE}};
+    padding: 10px 15px;
+    border-radius: 18px;
+    border-bottom-right-radius: 4px; /* Kleiner visueller Akzent */
+    color: white;
 }
 
-/* LLM's chat bubble (left-aligned) */
 QLabel[class="llm-bubble"] {
-    background-color: {{{COLORS.LLM_BUBBLE}}};
+    background-color: {{COLORS.LLM_BUBBLE}};
+    padding: 10px 15px;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    color: white;
 }
-
