@@ -1,4 +1,5 @@
 import re
+import markdown
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                                QPushButton, QLabel, QScrollArea)
 from PySide6.QtCore import Qt, QTimer, QThread, Signal
@@ -117,19 +118,29 @@ class ChatWidget(QWidget):
     def _update_stream(self, chunk):
         """Wird für jedes Wort/Token aufgerufen"""
         if not self.current_llm_bubble:
+            # Leere Bubble erstellen
             self.current_llm_bubble = self._add_bubble("", is_user=False)
 
         self.full_response += chunk
-        self.current_llm_bubble.setText(self.full_response)
+
+        # Live-Update: Markdown in HTML wandeln
+        html_content = self._text_to_html(self.full_response)
+        self.current_llm_bubble.setText(html_content)
+
         self._scroll_to_bottom()
 
     def _finalize_stream(self):
         """Wenn die Antwort fertig ist"""
         # Bot-Nachricht in Session speichern
         bot_id = str(self.current_bot_profile.id) if self.current_bot_profile else "unknown"
+
+        # Sicherstellen, dass der letzte Stand sauber gerendert ist
+        if self.current_llm_bubble:
+            self.current_llm_bubble.setText(self._text_to_html(self.full_response))
+
         bot_msg = ChatMessage(
             role="assistant",
-            content=self.full_response,
+            content=self.full_response,  # Wir speichern das Original-Markdown, nicht das HTML!
             sender_id=bot_id
         )
         self.current_session.messages.append(bot_msg)
@@ -138,10 +149,26 @@ class ChatWidget(QWidget):
         self.input_field.setFocus()
         self.thread.quit()
 
+    def _text_to_html(self, text):
+        """Wandelt Markdown in HTML für das QLabel um."""
+        # extensions:
+        # 'fenced_code': Erlaubt Code-Blöcke mit ```
+        # 'nl2br': Wandelt Newlines in <br> um, damit Zeilenumbrüche erhalten bleiben
+        html = markdown.markdown(text, extensions=['fenced_code', 'nl2br'])
+        return html
+
     def _add_bubble(self, text, is_user):
-        label = QLabel(text)
+        # Konvertiere Text zu HTML für die Anzeige
+        display_content = self._text_to_html(text)
+
+        label = QLabel(display_content)
         label.setWordWrap(True)
-        label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.LinksAccessibleByMouse)
+
+        # WICHTIG: Damit HTML interpretiert wird
+        label.setTextFormat(Qt.TextFormat.RichText)
+        label.setOpenExternalLinks(True)
 
         # CSS Klasse für Styling zuweisen
         label.setProperty("class", "user-bubble" if is_user else "llm-bubble")
