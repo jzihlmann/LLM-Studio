@@ -7,7 +7,6 @@ QMainWindow, QWidget {
 }
 
 /* --- Die drei Bento-Boxen (Container) --- */
-/* Diese IDs steuern den "Liquid Glass" Look */
 #container_nav, #container_sidebar, #container_chat {
     background-color: {{COLORS.GLASS_BG}};
     border: 1px solid {{COLORS.GLASS_BORDER}};
@@ -20,22 +19,34 @@ QMainWindow, QWidget {
     font-weight: bold;
     padding: 8px 16px;
     border-radius: 8px;
-    background-color: transparent; /* Button fügt sich in Glas-Container ein */
+    background-color: transparent;
 }
 #top_nav_button:hover {
     background-color: {{COLORS.BACKGROUND_LIGHT}};
 }
 
 /* --- Sidebar Inhalt --- */
-/* Damit die Liste transparent ist und der Container-Hintergrund wirkt */
 QListWidget {
     background-color: transparent;
     border: none;
     outline: none;
+    color: {{COLORS.TEXT}};
+    font-size: 14px;
+}
+QListWidget::item {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 5px;
+}
+QListWidget::item:selected {
+    background-color: {{COLORS.BACKGROUND_LIGHT}};
+    border: 1px solid {{COLORS.GLASS_BORDER}};
+}
+QListWidget::item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
 }
 
 /* --- Chat Bereich --- */
-/* Der Chat-Bereich selbst soll transparent sein, damit er im Container sitzt */
 QScrollArea, QWidget#chat_scroll_content {
     background-color: transparent;
 }
@@ -66,7 +77,7 @@ QLabel[class="user-bubble"] {
     background-color: {{COLORS.USER_BUBBLE}};
     padding: 10px 15px;
     border-radius: 18px;
-    border-bottom-right-radius: 4px; /* Kleiner visueller Akzent */
+    border-bottom-right-radius: 4px;
     color: white;
 }
 
@@ -76,4 +87,20 @@ QLabel[class="llm-bubble"] {
     border-radius: 18px;
     border-bottom-left-radius: 4px;
     color: white;
+}
+
+/* --- NEU: Neuer Chat Button --- */
+#btn_new_chat {
+    background-color: {{COLORS.PRIMARY}};
+    color: white;
+    border-radius: 20px; /* Pillenform */
+    padding: 10px 20px;
+    font-weight: bold;
+    font-size: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+#btn_new_chat:hover {
+    background-color: #60a5fa;
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }

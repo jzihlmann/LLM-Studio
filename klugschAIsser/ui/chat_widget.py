@@ -1,17 +1,25 @@
 import re
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
                                QPushButton, QLabel, QScrollArea)
-from PySide6.QtCore import Qt, QTimer, QThread
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
+
 # Importiere Backend-Logik
 from klugschAIsser.core.ollama_client import OllamaClient
 from klugschAIsser.core.worker import OllamaWorker
+from klugschAIsser.core.types import ChatSession, ChatMessage, BotProfile
 
 
 class ChatWidget(QWidget):
+    # Signal für Sidebar-Update (Titel)
+    chat_title_updated = Signal()
+
     def __init__(self):
         super().__init__()
         self.ollama_client = OllamaClient()  # Verbindung zu Ollama
-        self.conversation_history = []
+
+        # State Management für Sessions
+        self.current_session = None
+        self.current_bot_profile = None
         self.worker_thread = None
 
         # Layout
@@ -24,8 +32,10 @@ class ChatWidget(QWidget):
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.scroll_content = QWidget()
+        self.scroll_content.setObjectName("chat_scroll_content")  # Für CSS
+
         self.chat_layout = QVBoxLayout(self.scroll_content)
-        self.chat_layout.addStretch()  # Drückt Nachrichten nach unten
+        self.chat_layout.addStretch()  # Drückt Nachrichten nach oben (Stretch ist unten)
         self.chat_layout.setSpacing(15)
         self.scroll_area.setWidget(self.scroll_content)
 
@@ -44,19 +54,54 @@ class ChatWidget(QWidget):
         layout.addWidget(self.scroll_area)
         layout.addLayout(input_layout)
 
+    def load_session(self, session: ChatSession, bot_profile: BotProfile):
+        """Lädt eine existierende Session und stellt die Bubbles wieder her."""
+        self.current_session = session
+        self.current_bot_profile = bot_profile
+
+        # 1. Alten Chat leeren (alles entfernen ausser dem Stretch am Ende)
+        while self.chat_layout.count() > 1:
+            item = self.chat_layout.takeAt(0)  # Immer das oberste Element nehmen
+            if item.widget():
+                item.widget().deleteLater()
+            elif item.layout():
+                while item.layout().count():
+                    child = item.layout().takeAt(0)
+                    if child.widget():
+                        child.widget().deleteLater()
+
+        # 2. Nachrichten wiederherstellen
+        for msg in session.messages:
+            self._add_bubble(msg.content, is_user=(msg.role == "user"))
+
+        self.input_field.setFocus()
+
     def send_message(self):
+        if not self.current_session:
+            return
+
         text = self.input_field.text().strip()
         if not text: return
 
-        # User Nachricht anzeigen
+        # 1. UI Update (User Nachricht)
         self._add_bubble(text, is_user=True)
-        self.conversation_history.append({'role': 'user', 'content': text})
         self.input_field.clear()
         self.input_field.setEnabled(False)  # Eingabe sperren während Generierung
 
-        # Threading für LLM (verhindert UI-Freeze)
+        # 2. Daten Update (In Session speichern)
+        user_msg = ChatMessage(role="user", content=text)
+        self.current_session.messages.append(user_msg)
+
+        # Titel aktualisieren, falls es die erste Nachricht ist
+        if self.current_session.update_title_from_content():
+            self.chat_title_updated.emit()
+
+        # 3. LLM Vorbereiten (Verlauf konvertieren)
+        history_dicts = [m.to_ollama_dict() for m in self.current_session.messages]
+
+        # Threading für LLM
         self.thread = QThread()
-        self.worker = OllamaWorker(self.ollama_client, self.conversation_history)
+        self.worker = OllamaWorker(self.ollama_client, history_dicts)
         self.worker.moveToThread(self.thread)
 
         # Signale verbinden (Streaming Support)
@@ -80,7 +125,15 @@ class ChatWidget(QWidget):
 
     def _finalize_stream(self):
         """Wenn die Antwort fertig ist"""
-        self.conversation_history.append({'role': 'assistant', 'content': self.full_response})
+        # Bot-Nachricht in Session speichern
+        bot_id = str(self.current_bot_profile.id) if self.current_bot_profile else "unknown"
+        bot_msg = ChatMessage(
+            role="assistant",
+            content=self.full_response,
+            sender_id=bot_id
+        )
+        self.current_session.messages.append(bot_msg)
+
         self.input_field.setEnabled(True)
         self.input_field.setFocus()
         self.thread.quit()
@@ -93,8 +146,10 @@ class ChatWidget(QWidget):
         # CSS Klasse für Styling zuweisen
         label.setProperty("class", "user-bubble" if is_user else "llm-bubble")
 
-        # Maximale Breite der Bubble
-        label.setMaximumWidth(int(self.width() * 0.7))
+        # Maximale Breite der Bubble (Fix gegen "Springen" und zu breite Texte)
+        # Max 750px oder 85% der Fensterbreite
+        max_width = min(750, int(self.width() * 0.85))
+        label.setMaximumWidth(max_width)
 
         h_layout = QHBoxLayout()
         if is_user:
@@ -104,6 +159,7 @@ class ChatWidget(QWidget):
             h_layout.addWidget(label)
             h_layout.addStretch()
 
+        # Einfügen VOR dem Stretch (Stretch ist das letzte Element)
         self.chat_layout.insertLayout(self.chat_layout.count() - 1, h_layout)
         self._scroll_to_bottom()
         return label
