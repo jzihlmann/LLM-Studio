@@ -1,197 +1,126 @@
-import re
-import markdown
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLineEdit,
-                               QPushButton, QLabel, QScrollArea)
-from PySide6.QtCore import Qt, QTimer, QThread, Signal
-
-# Importiere Backend-Logik
+from nicegui import ui
 from klugschAIsser.core.ollama_client import OllamaClient
-from klugschAIsser.core.worker import OllamaWorker
-from klugschAIsser.core.types import ChatSession, ChatMessage, BotProfile
+from klugschAIsser.core.types import ChatMessage, ChatSession
 
 
-class ChatWidget(QWidget):
-    # Signal für Sidebar-Update (Titel)
-    chat_title_updated = Signal()
-
+class ChatWidget:
     def __init__(self):
-        super().__init__()
-        self.ollama_client = OllamaClient()  # Verbindung zu Ollama
+        self.client = OllamaClient()
+        self.active_session = None
 
-        # State Management für Sessions
-        self.current_session = None
-        self.current_bot_profile = None
-        self.worker_thread = None
+        # UI-Referenzen
+        self.chat_container = None
+        self.input_field = None
+        self.footer = None
 
-        # Layout
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+    def build(self):
+        """Erstellt die UI-Elemente für den Chat."""
 
-        # Scroll-Bereich für Nachrichten
-        self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # 1. Nachrichten-Bereich
+        with ui.column().classes('w-full max-w-4xl mx-auto p-4 gap-8 pb-32') as self.chat_container:
+            if not self.active_session:
+                ui.label('Bitte wähle oder erstelle einen Chat.').classes('text-gray-500 italic')
+            else:
+                self._render_messages()
 
-        self.scroll_content = QWidget()
-        self.scroll_content.setObjectName("chat_scroll_content")  # Für CSS
+        # 2. Eingabe-Bereich (Fixed Bottom)
+        with ui.footer().classes('bg-slate-900/90 no-shadow p-4 z-50'):
 
-        self.chat_layout = QVBoxLayout(self.scroll_content)
-        self.chat_layout.addStretch()  # Drückt Nachrichten nach oben (Stretch ist unten)
-        self.chat_layout.setSpacing(15)
-        self.scroll_area.setWidget(self.scroll_content)
+            with ui.row().classes(
+                    'w-full max-w-4xl mx-auto bg-slate-800 rounded-xl px-4 py-2 items-end border border-gray-700 shadow-2xl') as self.footer:
+                # ÄNDERUNG: input-style hinzugefügt
+                # max-height: 50vh -> Maximal 50% der Fensterhöhe
+                # overflow-y: auto -> Scrollbalken erscheint, wenn Text länger ist
+                self.input_field = ui.textarea(placeholder='Frag KlugschAIsser...') \
+                    .classes('w-full text-gray-100 bg-transparent') \
+                    .props('dark borderless autogrow rows=1 input-style="max-height: 50vh; overflow-y: auto"') \
+                    .on('keydown.enter.prevent', self.handle_enter, args=['shiftKey'])
 
-        # Eingabe-Bereich
-        input_layout = QHBoxLayout()
-        self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Nachricht eingeben...")
-        self.input_field.returnPressed.connect(self.send_message)
+                with self.input_field.add_slot('append'):
+                    ui.button(icon='send', on_click=self.send_message) \
+                        .props('flat round dense text-color=blue') \
+                        .classes('mb-1')
 
-        self.send_btn = QPushButton("Senden")
-        self.send_btn.clicked.connect(self.send_message)
-
-        input_layout.addWidget(self.input_field)
-        input_layout.addWidget(self.send_btn)
-
-        layout.addWidget(self.scroll_area)
-        layout.addLayout(input_layout)
-
-    def load_session(self, session: ChatSession, bot_profile: BotProfile):
-        """Lädt eine existierende Session und stellt die Bubbles wieder her."""
-        self.current_session = session
-        self.current_bot_profile = bot_profile
-
-        # 1. Alten Chat leeren (alles entfernen ausser dem Stretch am Ende)
-        while self.chat_layout.count() > 1:
-            item = self.chat_layout.takeAt(0)  # Immer das oberste Element nehmen
-            if item.widget():
-                item.widget().deleteLater()
-            elif item.layout():
-                while item.layout().count():
-                    child = item.layout().takeAt(0)
-                    if child.widget():
-                        child.widget().deleteLater()
-
-        # 2. Nachrichten wiederherstellen
-        for msg in session.messages:
-            self._add_bubble(msg.content, is_user=(msg.role == "user"))
-
-        self.input_field.setFocus()
-
-    def send_message(self):
-        if not self.current_session:
-            return
-
-        text = self.input_field.text().strip()
-        if not text: return
-
-        # 1. UI Update (User Nachricht)
-        self._add_bubble(text, is_user=True)
-        self.input_field.clear()
-        self.input_field.setEnabled(False)  # Eingabe sperren während Generierung
-
-        # 2. Daten Update (In Session speichern)
-        user_msg = ChatMessage(role="user", content=text)
-        self.current_session.messages.append(user_msg)
-
-        # Titel aktualisieren, falls es die erste Nachricht ist
-        if self.current_session.update_title_from_content():
-            self.chat_title_updated.emit()
-
-        # 3. LLM Vorbereiten (Verlauf konvertieren)
-        history_dicts = [m.to_ollama_dict() for m in self.current_session.messages]
-
-        # Threading für LLM
-        self.thread = QThread()
-        self.worker = OllamaWorker(self.ollama_client, history_dicts)
-        self.worker.moveToThread(self.thread)
-
-        # Signale verbinden (Streaming Support)
-        self.worker.chunk_received.connect(self._update_stream)
-        self.worker.finished.connect(self._finalize_stream)
-        self.thread.started.connect(self.worker.run)
-        self.thread.finished.connect(self.thread.deleteLater)
-
-        self.current_llm_bubble = None
-        self.full_response = ""
-        self.thread.start()
-
-    def _update_stream(self, chunk):
-        """Wird für jedes Wort/Token aufgerufen"""
-        if not self.current_llm_bubble:
-            # Leere Bubble erstellen
-            self.current_llm_bubble = self._add_bubble("", is_user=False)
-
-        self.full_response += chunk
-
-        # Live-Update: Markdown in HTML wandeln
-        html_content = self._text_to_html(self.full_response)
-        self.current_llm_bubble.setText(html_content)
-
-        self._scroll_to_bottom()
-
-    def _finalize_stream(self):
-        """Wenn die Antwort fertig ist"""
-        # Bot-Nachricht in Session speichern
-        bot_id = str(self.current_bot_profile.id) if self.current_bot_profile else "unknown"
-
-        # Sicherstellen, dass der letzte Stand sauber gerendert ist
-        if self.current_llm_bubble:
-            self.current_llm_bubble.setText(self._text_to_html(self.full_response))
-
-        bot_msg = ChatMessage(
-            role="assistant",
-            content=self.full_response,  # Wir speichern das Original-Markdown, nicht das HTML!
-            sender_id=bot_id
-        )
-        self.current_session.messages.append(bot_msg)
-
-        self.input_field.setEnabled(True)
-        self.input_field.setFocus()
-        self.thread.quit()
-
-    def _text_to_html(self, text):
-        """Wandelt Markdown in HTML für das QLabel um."""
-        # extensions:
-        # 'fenced_code': Erlaubt Code-Blöcke mit ```
-        # 'nl2br': Wandelt Newlines in <br> um, damit Zeilenumbrüche erhalten bleiben
-        html = markdown.markdown(text, extensions=['fenced_code', 'nl2br'])
-        return html
-
-    def _add_bubble(self, text, is_user):
-        # Konvertiere Text zu HTML für die Anzeige
-        display_content = self._text_to_html(text)
-
-        label = QLabel(display_content)
-        label.setWordWrap(True)
-        label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse | Qt.TextInteractionFlag.LinksAccessibleByMouse)
-
-        # WICHTIG: Damit HTML interpretiert wird
-        label.setTextFormat(Qt.TextFormat.RichText)
-        label.setOpenExternalLinks(True)
-
-        # CSS Klasse für Styling zuweisen
-        label.setProperty("class", "user-bubble" if is_user else "llm-bubble")
-
-        # Maximale Breite der Bubble (Fix gegen "Springen" und zu breite Texte)
-        # Max 750px oder 85% der Fensterbreite
-        max_width = min(750, int(self.width() * 0.85))
-        label.setMaximumWidth(max_width)
-
-        h_layout = QHBoxLayout()
-        if is_user:
-            h_layout.addStretch()
-            h_layout.addWidget(label)
+    async def handle_enter(self, e):
+        """Entscheidet anhand der Shift-Taste, was passiert."""
+        if e.args['shiftKey']:
+            # Shift+Enter: Zeilenumbruch manuell einfügen
+            self.input_field.value = (self.input_field.value or "") + "\n"
         else:
-            h_layout.addWidget(label)
-            h_layout.addStretch()
+            # Nur Enter: Senden
+            await self.send_message()
 
-        # Einfügen VOR dem Stretch (Stretch ist das letzte Element)
-        self.chat_layout.insertLayout(self.chat_layout.count() - 1, h_layout)
-        self._scroll_to_bottom()
-        return label
+    def set_session(self, session: ChatSession):
+        self.active_session = session
+        self.chat_container.clear()
+        with self.chat_container:
+            self._render_messages()
 
-    def _scroll_to_bottom(self):
-        # Scrollt automatisch nach unten
-        sb = self.scroll_area.verticalScrollBar()
-        sb.setValue(sb.maximum())
+    def _render_messages(self):
+        if not self.active_session: return
+        for msg in self.active_session.messages:
+            self._create_message_element(msg.content, is_user=(msg.role == 'user'))
+
+    def _create_message_element(self, text, is_user):
+        if is_user:
+            # USER: Rechtsbündig
+            with ui.row().classes('w-full justify-end items-end gap-2'):
+                with ui.card().classes('bg-blue-600 text-white p-3 rounded-2xl rounded-tr-none max-w-[50%]'):
+                    ui.markdown(text).classes('text-base whitespace-pre-wrap')
+                ui.avatar(icon='person', color='blue-800', text_color='white').classes('mb-1')
+        else:
+            # BOT: Linksbündig, Flat Design
+            with ui.row().classes('w-full items-start gap-4 animate-fade'):
+                ui.avatar(icon='smart_toy', color='blue-grey-9', text_color='white').classes('mt-1')
+                with ui.column().classes('flex-grow min-w-0 spacing-y-1'):
+                    ui.label('KlugschAIsser').classes('text-blue-400 text-xs font-bold mb-1')
+                    content = ui.markdown(text).classes('w-full text-gray-200 leading-relaxed')
+                    return content
+
+    async def send_message(self):
+        if not self.active_session: return
+
+        text = self.input_field.value
+        if not text or not text.strip(): return
+
+        self.input_field.value = ''
+
+        # User Nachricht anzeigen
+        with self.chat_container:
+            self._create_message_element(text, is_user=True)
+
+        self.active_session.messages.append(ChatMessage(role='user', content=text))
+
+        # Platzhalter für Bot
+        with self.chat_container:
+            spinner_row = ui.row().classes('items-center gap-2')
+            with spinner_row:
+                ui.avatar(icon='smart_toy', color='blue-grey-9', text_color='white')
+                ui.spinner(size='1.5em', color='blue-400')
+
+            response_markdown = self._create_message_element("", is_user=False)
+
+        # LLM Streaming
+        full_response = ""
+        history_dicts = [m.to_ollama_dict() for m in self.active_session.messages]
+
+        try:
+            first_chunk = True
+            async for chunk in self.client.chat(history_dicts):
+                if first_chunk:
+                    spinner_row.delete()
+                    first_chunk = False
+
+                full_response += chunk
+                if response_markdown:
+                    response_markdown.content = full_response
+
+                ui.run_javascript("window.scrollTo(0, document.body.scrollHeight);")
+
+        except Exception as e:
+            ui.notify(f"Fehler: {e}", type='negative')
+            if 'spinner_row' in locals(): spinner_row.delete()
+
+        bot_msg = ChatMessage(role='assistant', content=full_response)
+        self.active_session.messages.append(bot_msg)
+        self.active_session.update_title_from_content()
